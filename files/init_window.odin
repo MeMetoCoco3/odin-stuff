@@ -4,7 +4,6 @@ import "base:runtime"
 import "core:log"
 import "core:math/linalg"
 import sdl "vendor:sdl3"
-
 default_context: runtime.Context
 
 frag_shader_code := #load("shader.spv.frag")
@@ -13,7 +12,6 @@ vert_shader_code := #load("shader.spv.vert")
 main :: proc() {
 	context.logger = log.create_console_logger()
 	default_context = context
-
 	sdl.SetLogPriorities(.VERBOSE)
 	sdl.SetLogOutputFunction(
 		proc "c" (
