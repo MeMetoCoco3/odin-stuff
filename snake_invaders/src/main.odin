@@ -79,8 +79,9 @@ update :: proc(game: ^Game) {
 
 get_input :: proc(game: ^Game) {
 	current_direction := game.player.head.direction
-	game.player.last_change += 1
-	if (rl.IsKeyDown(.H) || rl.IsKeyDown(.LEFT)) && game.player.last_change > 10 {
+	game.player.last_change += PLAYER_SPEED
+	fmt.println(game.player.last_change)
+	if (rl.IsKeyDown(.H) || rl.IsKeyDown(.LEFT)) && game.player.last_change > PLAYER_SIZE {
 		if !oposite_directions(Directions[DIR_IDX.LEFT], current_direction) {
 			game.player.head.direction = get_direction(DIR_IDX.LEFT)
 			game.player.last_change = 0
@@ -93,7 +94,7 @@ get_input :: proc(game: ^Game) {
 			}
 		}
 	}
-	if (rl.IsKeyDown(.L) || rl.IsKeyDown(.RIGHT)) && game.player.last_change > 10 {
+	if (rl.IsKeyDown(.L) || rl.IsKeyDown(.RIGHT)) && game.player.last_change > PLAYER_SIZE {
 		if !oposite_directions(Directions[DIR_IDX.RIGHT], current_direction) {
 			game.player.head.direction = get_direction(DIR_IDX.RIGHT)
 			game.player.last_change = 0
@@ -106,7 +107,7 @@ get_input :: proc(game: ^Game) {
 			}
 		}
 	}
-	if (rl.IsKeyDown(.J) || rl.IsKeyDown(.DOWN)) && game.player.last_change > 10 {
+	if (rl.IsKeyDown(.J) || rl.IsKeyDown(.DOWN)) && game.player.last_change > PLAYER_SIZE {
 		if !oposite_directions(Directions[DIR_IDX.DOWN], current_direction) {
 			game.player.head.direction = get_direction(DIR_IDX.DOWN)
 			game.player.last_change = 0
@@ -119,7 +120,7 @@ get_input :: proc(game: ^Game) {
 			}
 		}
 	}
-	if (rl.IsKeyDown(.K) || rl.IsKeyDown(.UP)) && game.player.last_change > 10 {
+	if (rl.IsKeyDown(.K) || rl.IsKeyDown(.UP)) && game.player.last_change > PLAYER_SIZE {
 		if !oposite_directions(Directions[DIR_IDX.UP], current_direction) {
 			game.player.head.direction = get_direction(DIR_IDX.UP)
 			game.player.last_change = 0
@@ -140,25 +141,30 @@ update_player :: proc(player: ^Player) {
 	for i in 0 ..< player.num_cells {
 		if i == 0 {
 			if ((player.head.position.x == player.body[i].position.x) ||
-				   (player.head.position.y == player.body[i].position.y)) &&
-			   vec2_distance(player.head.position, player.body[i].position) >= PLAYER_SIZE {
-				player.body[i].direction = player.head.direction
+				   (player.head.position.y == player.body[i].position.y)) {
+
+				distance := vec2_distance(player.head.position, player.body[i].position)
+				if distance >= PLAYER_SIZE {
+					player.body[i].direction = player.head.direction
+				}
 			}
 		} else {
 			prev_cell := player.body[i - 1]
 			if ((prev_cell.position.x == player.body[i].position.x) ||
-				   (prev_cell.position.y == player.body[i].position.y)) &&
-			   vec2_distance(player.head.position, player.body[i].position) >= PLAYER_SIZE {
-				{
+				   (prev_cell.position.y == player.body[i].position.y)) {
+
+				distance := vec2_distance(prev_cell.position, player.body[i].position)
+				if distance >= PLAYER_SIZE {
 					player.body[i].direction = prev_cell.direction
 				}
 			}
-			if i == player.num_cells - 1 {
-				dealing_ghost_piece(player, i)
-			}
-			player.body[i].position.x += player.body[i].direction.x * PLAYER_SPEED
-			player.body[i].position.y += player.body[i].direction.y * PLAYER_SPEED
 		}
+
+		if i == player.num_cells - 1 {
+			dealing_ghost_piece(player, i)
+		}
+		player.body[i].position.x += player.body[i].direction.x * PLAYER_SPEED
+		player.body[i].position.y += player.body[i].direction.y * PLAYER_SPEED
 	}
 }
 
@@ -176,7 +182,6 @@ grow_body :: proc(pj: ^Player) {
 		new_x = pj.body[pj.num_cells - 1].position.x
 		new_y = pj.body[pj.num_cells - 1].position.y
 	}
-
 	// if pj.num_cells == 0 {
 	// 	direction = pj.head.direction
 	// 	new_x = pj.head.position.x - (PLAYER_SIZE * direction.x)
@@ -186,10 +191,15 @@ grow_body :: proc(pj: ^Player) {
 	// 	new_x = pj.body[pj.num_cells - 1].position.x - (PLAYER_SIZE * direction.x)
 	// 	new_y = pj.body[pj.num_cells - 1].position.y - (PLAYER_SIZE * direction.y)
 	// }
-	//
+
 	new_cell := cell_t{{new_x, new_y}, direction}
 	pj.body[pj.num_cells] = new_cell
 	pj.num_cells += 1
+
+	fmt.println(pj.head)
+	for i in 0 ..< pj.num_cells {
+		fmt.println(pj.body[i])
+	}
 }
 
 dealing_ghost_piece :: proc(player: ^Player, last_piece: i8) {
@@ -297,7 +307,6 @@ check_collision :: proc(game: ^Game) {
 			}
 			game.num_candies -= 1
 			grow_body(game.player)
-			fmt.println("you got candy!")
 		}
 	}
 }
