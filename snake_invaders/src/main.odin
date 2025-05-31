@@ -77,13 +77,14 @@ update :: proc(game: ^Game) {
 	update_player(game.player)
 }
 
+// TODO: CHECK IF IT IS A TURN,
 get_input :: proc(game: ^Game) {
 	current_direction := game.player.head.direction
 	game.player.last_change += PLAYER_SPEED
-	fmt.println(game.player.last_change)
 	if (rl.IsKeyDown(.H) || rl.IsKeyDown(.LEFT)) && game.player.last_change > PLAYER_SIZE {
-		if !oposite_directions(Directions[DIR_IDX.LEFT], current_direction) {
-			game.player.head.direction = get_direction(DIR_IDX.LEFT)
+		if !oposite_directions({-1, 0}, current_direction) {
+			fmt.println("LEFT")
+			game.player.head.direction = {-1, 0}
 			game.player.last_change = 0
 
 			if (game.player.num_cells > 0) {
@@ -95,8 +96,9 @@ get_input :: proc(game: ^Game) {
 		}
 	}
 	if (rl.IsKeyDown(.L) || rl.IsKeyDown(.RIGHT)) && game.player.last_change > PLAYER_SIZE {
-		if !oposite_directions(Directions[DIR_IDX.RIGHT], current_direction) {
-			game.player.head.direction = get_direction(DIR_IDX.RIGHT)
+		if !oposite_directions({1, 0}, current_direction) {
+			fmt.println("RIGHT")
+			game.player.head.direction = {1, 0}
 			game.player.last_change = 0
 
 			if (game.player.num_cells > 0) {
@@ -108,8 +110,9 @@ get_input :: proc(game: ^Game) {
 		}
 	}
 	if (rl.IsKeyDown(.J) || rl.IsKeyDown(.DOWN)) && game.player.last_change > PLAYER_SIZE {
-		if !oposite_directions(Directions[DIR_IDX.DOWN], current_direction) {
-			game.player.head.direction = get_direction(DIR_IDX.DOWN)
+		if !oposite_directions({0, 1}, current_direction) {
+			fmt.println("DOWN")
+			game.player.head.direction = {0, 1}
 			game.player.last_change = 0
 
 			if (game.player.num_cells > 0) {
@@ -121,8 +124,9 @@ get_input :: proc(game: ^Game) {
 		}
 	}
 	if (rl.IsKeyDown(.K) || rl.IsKeyDown(.UP)) && game.player.last_change > PLAYER_SIZE {
-		if !oposite_directions(Directions[DIR_IDX.UP], current_direction) {
-			game.player.head.direction = get_direction(DIR_IDX.UP)
+		if !oposite_directions({0, -1}, current_direction) {
+			fmt.println("UP")
+			game.player.head.direction = {0, -1}
 			game.player.last_change = 0
 
 			if (game.player.num_cells > 0) {
@@ -195,11 +199,7 @@ grow_body :: proc(pj: ^Player) {
 	new_cell := cell_t{{new_x, new_y}, direction}
 	pj.body[pj.num_cells] = new_cell
 	pj.num_cells += 1
-
-	fmt.println(pj.head)
-	for i in 0 ..< pj.num_cells {
-		fmt.println(pj.body[i])
-	}
+	pj.last_change = 0
 }
 
 dealing_ghost_piece :: proc(player: ^Player, last_piece: i8) {

@@ -13,7 +13,6 @@ Ringuffer_t :: struct {
 
 put_cell :: proc(rb: ^Ringuffer_t, cell: cell_ghost_t) {
 	if rb.count >= MAX_RINGBUFFER_VALUES {
-		fmt.println("JAMONAOSDADSA")
 		return
 	}
 	rb.values[rb.tail] = cell
