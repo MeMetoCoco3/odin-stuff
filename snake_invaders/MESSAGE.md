@@ -1,0 +1,1 @@
+CUANDO HAGO U TURNO, TODAS LAS PIEZAS SUMAN 1 en turns left, SI UNA PIEZA TIENE TURNS LEFT, chekea el turno que sea, y lo sigue, cuando se solapen,, seguira al siguiente ghost o a la siguiente pieza si sus turnos son ==0

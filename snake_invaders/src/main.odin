@@ -8,9 +8,8 @@ import rl "vendor:raylib"
 SCREEN_WIDTH :: 800
 SCREEN_HEIGHT :: 800
 PLAYER_SIZE :: 20
-PLAYER_SPEED :: 4
+PLAYER_SPEED :: 2
 MAX_NUM_BODY :: 20
-
 
 MAX_NUM_CANDIES :: 10
 CANDY_SIZE :: 20
@@ -29,7 +28,13 @@ main :: proc() {
 	}
 
 	pj := Player {
-		head         = cell_t{vec2_t{SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2}, {0, -1}},
+		head         = cell_t {
+			vec2_t{SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2},
+			{0, -1},
+			0,
+			PLAYER_SIZE,
+		},
+		body         = [MAX_NUM_BODY]cell_t{},
 		health       = 3,
 		ghost_pieces = &ring_buffer,
 		prev_dir     = {0, 0},
@@ -76,6 +81,8 @@ update :: proc(game: ^Game) {
 	get_input(game)
 	check_collision(game)
 	update_player(game.player)
+
+	TESTING(game)
 }
 
 get_input :: proc(game: ^Game) {
@@ -104,6 +111,8 @@ try_set_dir :: proc(p: ^Player, dir: vec2_t) {
 
 		if p.num_cells > 0 {
 			put_cell(p.ghost_pieces, cell_ghost_t{p.head.position, p.head.direction})
+			add_turn_count(p)
+			fmt.println("TURNINGGG")
 		}
 	}
 }
@@ -115,18 +124,45 @@ aligned_to_grid :: proc(p: vec2_t) -> bool {
 update_player :: proc(player: ^Player) {
 	player.head.position.x += player.head.direction.x * PLAYER_SPEED
 	player.head.position.y += player.head.direction.y * PLAYER_SPEED
+
 	for i in 0 ..< player.num_cells {
 		piece_to_follow: cell_t
-		if i == 0 {
-			piece_to_follow = player.head
-		} else {
-			piece_to_follow = player.body[i - 1]
-		}
 
-		// It will start following once its far enough.
-		distance := vec2_distance(piece_to_follow.position, player.body[i].position)
-		if (distance >= PLAYER_SIZE) {
-			player.body[i].direction = piece_to_follow.direction
+
+		// TODO: Probably swap for this line 	piece_to_follow := (i == 0) ? player.head : player.body[i - 1]
+		if (player.body[i].count_turns_left == 0) {
+			if (i == 0) {
+				piece_to_follow = player.head
+			} else {
+				piece_to_follow = player.body[i - 1]
+			}
+			distance := vec2_distance(piece_to_follow.position, player.body[i].position)
+			if (distance >= PLAYER_SIZE) {
+				player.body[i].direction = piece_to_follow.direction
+			}
+		} else {
+			index :=
+				(MAX_RINGBUFFER_VALUES +
+					player.ghost_pieces.tail -
+					player.body[i].count_turns_left) %
+				MAX_RINGBUFFER_VALUES
+
+			following_ghost_piece := ghost_to_cell(player.ghost_pieces.values[index])
+
+			if ((player.body[i].direction == {0, 0}) &&
+				   aligned(player.body[i].position, following_ghost_piece.position)) {
+
+				direction_to_ghost := get_cardinal_direction(
+					player.body[i].position,
+					following_ghost_piece.position,
+				)
+				fmt.printf("IDX %d IS FOLLOWING GHOST PIECE\n", i)
+
+				player.body[i].direction = direction_to_ghost
+			} else if (player.body[i].position == following_ghost_piece.position) {
+				player.body[i].direction = following_ghost_piece.direction
+				player.body[i].count_turns_left -= 1
+			}
 		}
 
 		if (i == player.num_cells - 1) {
@@ -139,20 +175,34 @@ update_player :: proc(player: ^Player) {
 }
 
 grow_body :: proc(pj: ^Player) {
+	fmt.println("WE EAT CANDY")
 	direction: vec2_t
 	new_x, new_y: f32
 
-	if pj.num_cells == 0 {
-		direction = {0, 0}
-		new_x = pj.head.position.x
-		new_y = pj.head.position.y
-	} else {
-		direction = {0, 0}
-		new_x = pj.body[pj.num_cells - 1].position.x
-		new_y = pj.body[pj.num_cells - 1].position.y
-	}
+	// if pj.num_cells == 0 {
+	// 	direction = pj.head.direction
+	// 	new_x = pj.head.position.x
+	// 	new_y = pj.head.position.y
+	// } else {
+	// 	pj.body[pj.num_cells - 1].direction
+	// 	new_x = pj.body[pj.num_cells - 1].position.x
+	// 	new_y = pj.body[pj.num_cells - 1].position.y
+	// }
 
-	new_cell := cell_t{{new_x, new_y}, direction}
+
+	if pj.num_cells == 0 {
+		direction = pj.head.direction
+		new_x = pj.head.position.x - direction.x * PLAYER_SIZE
+		new_y = pj.head.position.y - direction.y * PLAYER_SIZE
+	} else {
+		last := pj.body[pj.num_cells - 1]
+		direction = last.direction
+		new_x = last.position.x - direction.x * PLAYER_SIZE
+		new_y = last.position.y - direction.y * PLAYER_SIZE
+	}
+	// TODO: put limit here
+	num_ghost_pieces := pj.ghost_pieces.count
+	new_cell := cell_t{{new_x, new_y}, direction, num_ghost_pieces, 2}
 	pj.body[pj.num_cells] = new_cell
 	pj.num_cells += 1
 }
@@ -205,13 +255,53 @@ draw_player :: proc(player: ^Player) {
 	)
 	for i in 0 ..< player.num_cells {
 		cell := player.body[i]
-		rl.DrawRectangle(
-			i32(cell.position.x),
-			i32(cell.position.y),
-			PLAYER_SIZE,
-			PLAYER_SIZE,
-			rl.ORANGE,
-		)
+		if cell.size < PLAYER_SIZE {
+			x_position: f32
+			y_position: f32
+			cell_size_x: i8
+			cell_size_y: i8
+			direction := player.body[i].direction
+
+			piece_to_follow := (i == 0) ? player.head : player.body[i - 1]
+			switch direction {
+			case {0, 1}:
+				x_position = piece_to_follow.position.x
+				y_position = piece_to_follow.position.y - f32(cell.size)
+				cell_size_x = PLAYER_SIZE
+				cell_size_y = cell.size
+			case {0, -1}:
+				x_position = piece_to_follow.position.x
+				y_position = piece_to_follow.position.y + PLAYER_SIZE
+				cell_size_x = PLAYER_SIZE
+				cell_size_y = cell.size
+			case {1, 0}:
+				x_position = piece_to_follow.position.x - f32(cell.size)
+				y_position = piece_to_follow.position.y
+				cell_size_x = cell.size
+				cell_size_y = PLAYER_SIZE
+			case {-1, 0}:
+				x_position = piece_to_follow.position.x + PLAYER_SIZE
+				y_position = piece_to_follow.position.y
+				cell_size_x = cell.size
+				cell_size_y = PLAYER_SIZE
+			}
+			rl.DrawRectangle(
+				i32(x_position),
+				i32(y_position),
+				i32(cell_size_x),
+				i32(cell_size_y),
+				rl.PURPLE,
+			)
+			player.body[i].size += 2
+		} else {
+			rl.DrawRectangle(
+				i32(cell.position.x),
+				i32(cell.position.y),
+				PLAYER_SIZE,
+				PLAYER_SIZE,
+				rl.ORANGE,
+			)
+		}
 	}
 }
 
@@ -274,11 +364,85 @@ rec_colliding :: proc(v0: vec2_t, w0: f32, h0: f32, v1: vec2_t, w1: f32, h1: f32
 	return horizontal_in && vertical_in
 }
 
+aligned :: proc(v0: vec2_t, v1: vec2_t) -> bool {
+	return v0.x == v1.x || v0.y == v1.y
+}
+
 
 ////////////
 // OTHERS //
 ////////////
 
+add_turn_count :: proc(player: ^Player) {
+	for i in 0 ..< player.num_cells {
+		player.body[i].count_turns_left += 1
+	}
+}
+
+ghost_to_cell :: proc(cell: cell_ghost_t) -> cell_t {
+	return cell_t{position = cell.position, direction = cell.direction}
+}
+
 vec2_distance :: proc(a, b: vec2_t) -> f32 {
 	return math.sqrt(math.pow(b.x - a.x, 2.0) + math.pow(b.y - a.y, 2.0))
+}
+
+get_cardinal_direction :: proc(from, to: vec2_t) -> vec2_t {
+	dx := to.x - from.x
+	dy := to.y - from.y
+	// THE PROBLEM IS THAT WE HAVE TO APLY ANOTHER DIRECTION TO PIECES WHEN THEY ARE SPAWNED, not to all, just to the ones that blaabla, you can check up how is it going
+	if (abs(dx) > abs(dy)) {
+		return (dx > 0) ? vec2_t{1, 0} : vec2_t{-1, 0}
+	} else {
+		return (dy > 0) ? vec2_t{0, 1} : vec2_t{0, -1}
+	}
+}
+
+
+TESTING :: proc(game: ^Game) {
+	for i in 1 ..< game.player.num_cells {
+		prev_cell := game.player.body[i - 1]
+		next_cell := game.player.body[i]
+
+
+		if !rec_colliding(
+			prev_cell.position,
+			PLAYER_SIZE,
+			PLAYER_SIZE,
+			next_cell.position,
+			PLAYER_SIZE,
+			PLAYER_SIZE,
+		) {
+
+			fmt.println()
+			fmt.printf(
+				"LENGTH BODY %d, PREV_CELL IDX %d, NEXT_CELL IDX %d",
+				game.player.num_cells,
+				i - 1,
+				i,
+			)
+			fmt.println("PREV_CELL POS AND DIR", prev_cell.position, prev_cell.direction)
+			fmt.println("NEXT_CELL POS AND DIR", next_cell.position, next_cell.direction)
+		}
+
+		index :=
+			(MAX_RINGBUFFER_VALUES + game.player.ghost_pieces.tail - next_cell.count_turns_left) %
+			MAX_RINGBUFFER_VALUES
+
+		following_ghost_piece := ghost_to_cell(game.player.ghost_pieces.values[index])
+		if !aligned(next_cell.position, following_ghost_piece.position) &&
+		   next_cell.count_turns_left != 0 &&
+		   following_ghost_piece.position != {0, 0} {
+
+			fmt.println()
+			fmt.println()
+			fmt.println(
+				"GHOST POS AND DIR",
+				following_ghost_piece.position,
+				following_ghost_piece.direction,
+			)
+			fmt.println("NEXT_CELL POS AND DIR", next_cell.position, next_cell.direction)
+		}
+
+	}
 }

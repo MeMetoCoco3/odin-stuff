@@ -9,6 +9,8 @@ candy :: vec2_t
 
 cell_t :: struct {
 	position, direction: vec2_t,
+	count_turns_left:    i8,
+	size:                i8,
 }
 cell_ghost_t :: struct {
 	position, direction: vec2_t,
