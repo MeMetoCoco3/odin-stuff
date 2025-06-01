@@ -79,7 +79,6 @@ update :: proc(game: ^Game) {
 }
 
 get_input :: proc(game: ^Game) {
-
 	if (rl.IsKeyPressed(.H) || rl.IsKeyPressed(.LEFT)) {
 		game.player.next_dir = {-1, 0}
 	}
@@ -117,30 +116,23 @@ update_player :: proc(player: ^Player) {
 	player.head.position.x += player.head.direction.x * PLAYER_SPEED
 	player.head.position.y += player.head.direction.y * PLAYER_SPEED
 	for i in 0 ..< player.num_cells {
+		piece_to_follow: cell_t
 		if i == 0 {
-			if ((player.head.position.x == player.body[i].position.x) ||
-				   (player.head.position.y == player.body[i].position.y)) {
-
-				distance := vec2_distance(player.head.position, player.body[i].position)
-				if distance >= PLAYER_SIZE {
-					player.body[i].direction = player.head.direction
-				}
-			}
+			piece_to_follow = player.head
 		} else {
-			prev_cell := player.body[i - 1]
-			if ((prev_cell.position.x == player.body[i].position.x) ||
-				   (prev_cell.position.y == player.body[i].position.y)) {
-
-				distance := vec2_distance(prev_cell.position, player.body[i].position)
-				if distance >= PLAYER_SIZE {
-					player.body[i].direction = prev_cell.direction
-				}
-			}
+			piece_to_follow = player.body[i - 1]
 		}
 
-		if i == player.num_cells - 1 {
+		// It will start following once its far enough.
+		distance := vec2_distance(piece_to_follow.position, player.body[i].position)
+		if (distance >= PLAYER_SIZE) {
+			player.body[i].direction = piece_to_follow.direction
+		}
+
+		if (i == player.num_cells - 1) {
 			dealing_ghost_piece(player, i)
 		}
+
 		player.body[i].position.x += player.body[i].direction.x * PLAYER_SPEED
 		player.body[i].position.y += player.body[i].direction.y * PLAYER_SPEED
 	}
@@ -159,20 +151,10 @@ grow_body :: proc(pj: ^Player) {
 		new_x = pj.body[pj.num_cells - 1].position.x
 		new_y = pj.body[pj.num_cells - 1].position.y
 	}
-	// if pj.num_cells == 0 {
-	// 	direction = pj.head.direction
-	// 	new_x = pj.head.position.x - (PLAYER_SIZE * direction.x)
-	// 	new_y = pj.head.position.y - (PLAYER_SIZE * direction.y)
-	// } else {
-	// 	direction = pj.body[pj.num_cells - 1].direction
-	// 	new_x = pj.body[pj.num_cells - 1].position.x - (PLAYER_SIZE * direction.x)
-	// 	new_y = pj.body[pj.num_cells - 1].position.y - (PLAYER_SIZE * direction.y)
-	// }
 
 	new_cell := cell_t{{new_x, new_y}, direction}
 	pj.body[pj.num_cells] = new_cell
 	pj.num_cells += 1
-	pj.last_change = 0
 }
 
 dealing_ghost_piece :: proc(player: ^Player, last_piece: i8) {
