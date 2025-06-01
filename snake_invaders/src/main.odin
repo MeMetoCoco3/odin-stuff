@@ -29,9 +29,10 @@ main :: proc() {
 	}
 
 	pj := Player {
-		head         = cell_t{vec2_t{SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2}, {0, 0}},
+		head         = cell_t{vec2_t{SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2}, {0, -1}},
 		health       = 3,
 		ghost_pieces = &ring_buffer,
+		prev_dir     = {0, 0},
 	}
 
 	game := Game {
@@ -77,66 +78,39 @@ update :: proc(game: ^Game) {
 	update_player(game.player)
 }
 
-// TODO: CHECK IF IT IS A TURN,
 get_input :: proc(game: ^Game) {
-	current_direction := game.player.head.direction
-	game.player.last_change += PLAYER_SPEED
-	if (rl.IsKeyDown(.H) || rl.IsKeyDown(.LEFT)) && game.player.last_change > PLAYER_SIZE {
-		if !oposite_directions({-1, 0}, current_direction) {
-			fmt.println("LEFT")
-			game.player.head.direction = {-1, 0}
-			game.player.last_change = 0
 
-			if (game.player.num_cells > 0) {
-				put_cell(
-					game.player.ghost_pieces,
-					cell_ghost_t{game.player.head.position, game.player.head.direction},
-				)
-			}
+	if (rl.IsKeyPressed(.H) || rl.IsKeyPressed(.LEFT)) {
+		game.player.next_dir = {-1, 0}
+	}
+	if (rl.IsKeyPressed(.L) || rl.IsKeyPressed(.RIGHT)) {
+		game.player.next_dir = {1, 0}
+	}
+	if (rl.IsKeyPressed(.J) || rl.IsKeyPressed(.DOWN)) {
+		game.player.next_dir = {0, 1}
+	}
+	if (rl.IsKeyPressed(.K) || rl.IsKeyPressed(.UP)) {
+		game.player.next_dir = {0, -1}
+	}
+
+	if game.player.next_dir != game.player.prev_dir && aligned_to_grid(game.player.head.position) {
+		try_set_dir(game.player, game.player.next_dir)
+	}
+}
+
+try_set_dir :: proc(p: ^Player, dir: vec2_t) {
+	if !oposite_directions(dir, p.head.direction) && p.prev_dir != dir {
+		p.prev_dir = dir
+		p.head.direction = dir
+
+		if p.num_cells > 0 {
+			put_cell(p.ghost_pieces, cell_ghost_t{p.head.position, p.head.direction})
 		}
 	}
-	if (rl.IsKeyDown(.L) || rl.IsKeyDown(.RIGHT)) && game.player.last_change > PLAYER_SIZE {
-		if !oposite_directions({1, 0}, current_direction) {
-			fmt.println("RIGHT")
-			game.player.head.direction = {1, 0}
-			game.player.last_change = 0
+}
 
-			if (game.player.num_cells > 0) {
-				put_cell(
-					game.player.ghost_pieces,
-					cell_ghost_t{game.player.head.position, game.player.head.direction},
-				)
-			}
-		}
-	}
-	if (rl.IsKeyDown(.J) || rl.IsKeyDown(.DOWN)) && game.player.last_change > PLAYER_SIZE {
-		if !oposite_directions({0, 1}, current_direction) {
-			fmt.println("DOWN")
-			game.player.head.direction = {0, 1}
-			game.player.last_change = 0
-
-			if (game.player.num_cells > 0) {
-				put_cell(
-					game.player.ghost_pieces,
-					cell_ghost_t{game.player.head.position, game.player.head.direction},
-				)
-			}
-		}
-	}
-	if (rl.IsKeyDown(.K) || rl.IsKeyDown(.UP)) && game.player.last_change > PLAYER_SIZE {
-		if !oposite_directions({0, -1}, current_direction) {
-			fmt.println("UP")
-			game.player.head.direction = {0, -1}
-			game.player.last_change = 0
-
-			if (game.player.num_cells > 0) {
-				put_cell(
-					game.player.ghost_pieces,
-					cell_ghost_t{game.player.head.position, game.player.head.direction},
-				)
-			}
-		}
-	}
+aligned_to_grid :: proc(p: vec2_t) -> bool {
+	return i32(p.x) % PLAYER_SIZE == 0 && i32(p.y) % PLAYER_SIZE == 0
 }
 
 update_player :: proc(player: ^Player) {
@@ -171,7 +145,6 @@ update_player :: proc(player: ^Player) {
 		player.body[i].position.y += player.body[i].direction.y * PLAYER_SPEED
 	}
 }
-
 
 grow_body :: proc(pj: ^Player) {
 	direction: vec2_t
@@ -217,7 +190,7 @@ dealing_ghost_piece :: proc(player: ^Player, last_piece: i8) {
 		PLAYER_SIZE,
 	)
 
-	if is_colliding && player.body[last_piece].direction == ghost_piece.direction {
+	if (is_colliding && player.body[last_piece].direction == ghost_piece.direction) {
 		pop_cell(player.ghost_pieces)
 	}
 }

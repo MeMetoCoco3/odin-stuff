@@ -25,12 +25,14 @@ Directions: [4]vec2_t = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}}
 
 Player :: struct {
 	head:             cell_t,
-	health:           i8,
+	prev_dir:         vec2_t,
+	next_dir:         vec2_t,
 	body:             [MAX_NUM_BODY]cell_t,
+	health:           i8,
 	num_cells:        i8,
 	last_change:      i8,
-	ghost_pieces:     ^Ringuffer_t,
 	num_ghost_pieces: i8,
+	ghost_pieces:     ^Ringuffer_t,
 }
 
 Game :: struct {
