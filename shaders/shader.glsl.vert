@@ -1,19 +1,17 @@
 #version 460
 
 
-layout(set=1,binding=0)uniform UBO{
+layout(set=1, binding=0)uniform UBO{
   mat4 mvp;
 };
 
-void main(){
-  vec4 position;
-  if (gl_VertexIndex == 0) {
-    position = vec4(-0.5, -0.5, 0, 1.0);
-  } else if (gl_VertexIndex == 1) {
-    position = vec4(0.0, 0.5, 0, 1.0);
-  } else if (gl_VertexIndex == 2) {
-    position = vec4(0.5, -0.5, 0, 1.0);
-  }
+layout(location=0) in vec3 position;
+layout(location=1) in vec4 color;
 
-  gl_Position = mvp*position;
+
+layout(location=0) out vec4 out_color;
+
+void main(){
+  gl_Position = mvp * vec4(position, 1);
+  out_color = color;
 }
