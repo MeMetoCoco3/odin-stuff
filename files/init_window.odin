@@ -111,10 +111,10 @@ main :: proc() {
 		uv:    [2]f32,
 	}
 	vertices := []Vertex_Data {
-		{pos = {-0.5, -0.5, 0}, color = {1, 1, 1, 1}, uv = {0, 1}},
-		{pos = {0.5, 0.5, 0}, color = {1, 1, 1, 1}, uv = {1, 0}},
-		{pos = {-0.5, 0.5, 0}, color = {1, 1, 1, 1}, uv = {0, 0}},
-		{pos = {0.5, -0.5, 0}, color = {1, 1, 1, 1}, uv = {1, 1}},
+		{pos = {-0.5, -0.5, 0}, color = {1, 1, 0, 1}, uv = {0, 1}},
+		{pos = {0.5, 0.5, 0}, color = {1, 1, 0, 1}, uv = {1, 0}},
+		{pos = {-0.5, 0.5, 0}, color = {1, 0, 1, 1}, uv = {0, 0}},
+		{pos = {0.5, -0.5, 0}, color = {0, 1, 1, 1}, uv = {1, 1}},
 	}
 	vertices_byte_size := len(vertices) * size_of(vertices[0])
 

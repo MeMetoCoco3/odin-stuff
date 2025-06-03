@@ -263,6 +263,23 @@ draw_player :: proc(player: ^Player) {
 			direction := player.body[i].direction
 
 			piece_to_follow := (i == 0) ? player.head : player.body[i - 1]
+
+			if player.ghost_pieces.count > 0 {
+				ghost_piece :=
+					player.ghost_pieces.values[get_ghost_piece_index(cell.count_turns_left, player.ghost_pieces.tail)]
+				if rec_colliding(
+					cell.position,
+					PLAYER_SIZE,
+					PLAYER_SIZE,
+					ghost_piece.position,
+					PLAYER_SIZE,
+					PLAYER_SIZE,
+				) {
+					piece_to_follow = ghost_to_cell(ghost_piece)
+				}
+			}
+
+
 			switch direction {
 			case {0, 1}:
 				x_position = piece_to_follow.position.x
@@ -396,6 +413,11 @@ get_cardinal_direction :: proc(from, to: vec2_t) -> vec2_t {
 	} else {
 		return (dy > 0) ? vec2_t{0, 1} : vec2_t{0, -1}
 	}
+}
+
+get_ghost_piece_index :: proc(turns_left, tail: i8) -> i8 {
+	index := (MAX_RINGBUFFER_VALUES + tail - turns_left) % MAX_RINGBUFFER_VALUES
+	return index
 }
 
 
