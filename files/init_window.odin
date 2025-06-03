@@ -5,11 +5,14 @@ import "core:log"
 import "core:math/linalg"
 import "core:mem"
 import sdl "vendor:sdl3"
+import stbi "vendor:stb/image"
+
 default_context: runtime.Context
 
 // Load file as []u8
 frag_shader_code := #load("shader.spv.frag")
 vert_shader_code := #load("shader.spv.vert")
+
 
 main :: proc() {
 
@@ -44,23 +47,74 @@ main :: proc() {
 	// Asignamos una ventana al device.
 	ok = sdl.ClaimWindowForGPUDevice(gpu, window)
 
-
 	// Asignamos los shaders a la GPU.
-	vertex_shader := load_shader(gpu, vert_shader_code, .VERTEX, 1)
-	fragment_shader := load_shader(gpu, frag_shader_code, .FRAGMENT, 0)
+	vertex_shader := load_shader(
+		gpu,
+		vert_shader_code,
+		.VERTEX,
+		num_uniform_buffers = 1,
+		num_samplers = 0,
+	)
 
+	fragment_shader := load_shader(
+		gpu,
+		frag_shader_code,
+		.FRAGMENT,
+		num_uniform_buffers = 0,
+		num_samplers = 1, // Esta linea me ha matado, por su culpa la textura no renderizaba.
+	)
+
+	// Load pixels
+	img_size: [2]i32
+	pixels := stbi.load(
+		"files/texture.png",
+		&img_size.x,
+		&img_size.y,
+		nil,
+		4,
+	);assert(pixels != nil);defer stbi.image_free(pixels)
+	// pixels := sdli.Load("files/texture2.png");assert(pixels != nil)
+	// img_size.x, img_size.y = pixels.w, pixels.h
+	pixelx_byte_size := img_size.x * img_size.y * 4
+
+	// Create texture on the gpu
+	pixels_texture := sdl.CreateGPUTexture(
+		gpu,
+		{
+			format = .R8G8B8A8_UNORM,
+			usage = {.SAMPLER},
+			height = u32(img_size.y),
+			width = u32(img_size.x),
+			layer_count_or_depth = 1,
+			num_levels = 1,
+		},
+	)
+
+	tex_transfer_buffer := sdl.CreateGPUTransferBuffer(
+		gpu,
+		{usage = .UPLOAD, size = u32(pixelx_byte_size)},
+	)
+
+	tex_transfer_memory := transmute([^]byte)sdl.MapGPUTransferBuffer(
+		gpu,
+		tex_transfer_buffer,
+		false,
+	)
+	mem.copy(tex_transfer_memory, pixels, int(pixelx_byte_size))
+	sdl.UnmapGPUTransferBuffer(gpu, tex_transfer_buffer)
 
 	// Definimos los datos que vamos a pasar
 	Vec3 :: [3]f32
 	Vertex_Data :: struct {
 		pos:   Vec3,
 		color: sdl.FColor,
+		uv:    [2]f32,
 	}
 	vertices := []Vertex_Data {
-		{pos = {-0.5, -0.5, 0}, color = {0, 1, 0, 1}},
-		{pos = {0.5, 0.5, 0}, color = {0, 0, 1, 1}},
-		{pos = {-0.5, 0.5, 0}, color = {1, 1, 0, 1}},
-		{pos = {0.5, -0.5, 0}, color = {1, 1, 0, 1}},
+		{pos = {-0.5, -0.5, 0}, color = {1, 1, 1, 1}, uv = {0, 1}},
+		{pos = {0.5, 0.5, 0}, color = {1, 1, 1, 1}, uv = {1, 0}},
+		{pos = {-0.5, 0.5, 0}, color = {1, 1, 1, 1}, uv = {0, 0}},
+		{pos = {0.5, -0.5, 0}, color = {1, 1, 1, 1}, uv = {1, 1}},
 	}
 	vertices_byte_size := len(vertices) * size_of(vertices[0])
 
@@ -100,16 +154,31 @@ main :: proc() {
 		{buffer = index_buffer, size = u32(indices_byte_size)},
 		false,
 	)
+
+	sdl.UploadToGPUTexture(
+		copy_pass,
+		{transfer_buffer = tex_transfer_buffer},
+		{texture = pixels_texture, w = u32(img_size.x), h = u32(img_size.y), d = 1},
+		false,
+	)
+
 	sdl.EndGPUCopyPass(copy_pass)
+
 	ok = sdl.SubmitGPUCommandBuffer(copy_cmd_buffer);assert(ok)
+
 	// Ya hemos terminado con el transfer_buffer, asi que lo liberamos.
 	sdl.ReleaseGPUTransferBuffer(gpu, transfer_buffer)
+	sdl.ReleaseGPUTransferBuffer(gpu, tex_transfer_buffer)
+
+	// Create a sampler for shader
+	sampler := sdl.CreateGPUSampler(gpu, {})
 
 	// Describimos nuestros datos, en este caso decimos que vamos a pasar dos datos en esas localizaciones(las definimos en nuestros shaders), 
 	// tendran ese tamaño (3/4 floats), y tendran un offset de eso.
 	vertex_attributes := []sdl.GPUVertexAttribute {
 		{location = 0, format = .FLOAT3, offset = u32(offset_of(Vertex_Data, pos))},
 		{location = 1, format = .FLOAT4, offset = u32(offset_of(Vertex_Data, color))},
+		{location = 2, format = .FLOAT2, offset = u32(offset_of(Vertex_Data, uv))},
 	}
 
 
@@ -227,7 +296,12 @@ main :: proc() {
 			sdl.BindGPUIndexBuffer(render_pass, {buffer = index_buffer}, ._16BIT)
 			// Este 0 es el slot_index, hace referencia al binding = 0  en el vertex shader.
 			sdl.PushGPUVertexUniformData(cmd_buf, 0, &ubo, size_of(UBO))
-			sdl.DrawGPUPrimitives(render_pass, 3, 1, 0, 0)
+			sdl.BindGPUFragmentSamplers(
+				render_pass,
+				0,
+				&(sdl.GPUTextureSamplerBinding{texture = pixels_texture, sampler = sampler}),
+				1,
+			)
 			sdl.DrawGPUIndexedPrimitives(render_pass, 6, 1, 0, 0, 0)
 			sdl.EndGPURenderPass(render_pass)
 		} else {
@@ -244,6 +318,7 @@ load_shader :: proc(
 	code: []u8,
 	stage: sdl.GPUShaderStage,
 	num_uniform_buffers: u32,
+	num_samplers: u32,
 ) -> ^sdl.GPUShader {
 	return sdl.CreateGPUShader(
 		device,
@@ -254,8 +329,7 @@ load_shader :: proc(
 			format = {.SPIRV},
 			stage = stage,
 			num_uniform_buffers = num_uniform_buffers,
+			num_samplers = num_samplers,
 		},
 	)
-
-
 }
