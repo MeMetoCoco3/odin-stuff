@@ -1,5 +1,6 @@
 package main
 
+
 import "core:fmt"
 import "core:math"
 import "core:math/rand"
@@ -8,7 +9,7 @@ import rl "vendor:raylib"
 SCREEN_WIDTH :: 800
 SCREEN_HEIGHT :: 800
 PLAYER_SIZE :: 20
-PLAYER_SPEED :: 2
+PLAYER_SPEED :: 4
 MAX_NUM_BODY :: 20
 
 MAX_NUM_CANDIES :: 10
@@ -37,14 +38,17 @@ main :: proc() {
 		body         = [MAX_NUM_BODY]cell_t{},
 		health       = 3,
 		ghost_pieces = &ring_buffer,
-		prev_dir     = {0, 0},
+		next_dir     = {0, 0},
 	}
+
+	scene := scene(.ONE)
 
 	game := Game {
 		player      = &pj,
 		state       = true,
 		candies     = [MAX_NUM_CANDIES]candy{},
 		num_candies = 0,
+		scene       = scene,
 	}
 
 	time := 0
@@ -65,7 +69,7 @@ main :: proc() {
 		draw_player(&pj)
 		draw_ghost_cells(pj.ghost_pieces)
 		draw_candies(game.candies, game.num_candies)
-
+		draw_scene(game.scene)
 
 		rl.EndDrawing()
 
@@ -98,21 +102,22 @@ get_input :: proc(game: ^Game) {
 	if (rl.IsKeyPressed(.K) || rl.IsKeyPressed(.UP)) {
 		game.player.next_dir = {0, -1}
 	}
-
-	if game.player.next_dir != game.player.prev_dir && aligned_to_grid(game.player.head.position) {
-		try_set_dir(game.player, game.player.next_dir)
-	}
 }
 
-try_set_dir :: proc(p: ^Player, dir: vec2_t) {
-	if !oposite_directions(dir, p.head.direction) && p.prev_dir != dir {
-		p.prev_dir = dir
-		p.head.direction = dir
+try_set_dir :: proc(player: ^Player) {
+	// TODO: Allow this movement if bodylength is 0
 
-		if p.num_cells > 0 {
-			put_cell(p.ghost_pieces, cell_ghost_t{p.head.position, p.head.direction})
-			add_turn_count(p)
-			fmt.println("TURNINGGG")
+	prev_dir := player.head.direction
+	next_dir := player.next_dir
+	if !oposite_directions(next_dir, prev_dir) && next_dir != prev_dir {
+		player.head.direction = next_dir
+
+		if player.num_cells > 0 {
+			put_cell(
+				player.ghost_pieces,
+				cell_ghost_t{player.head.position, player.head.direction},
+			)
+			add_turn_count(player)
 		}
 	}
 }
@@ -122,20 +127,18 @@ aligned_to_grid :: proc(p: vec2_t) -> bool {
 }
 
 update_player :: proc(player: ^Player) {
+	if aligned_to_grid(player.head.position) {
+		try_set_dir(player)
+	}
+
 	player.head.position.x += player.head.direction.x * PLAYER_SPEED
 	player.head.position.y += player.head.direction.y * PLAYER_SPEED
 
 	for i in 0 ..< player.num_cells {
 		piece_to_follow: cell_t
 
-
-		// TODO: Probably swap for this line 	piece_to_follow := (i == 0) ? player.head : player.body[i - 1]
 		if (player.body[i].count_turns_left == 0) {
-			if (i == 0) {
-				piece_to_follow = player.head
-			} else {
-				piece_to_follow = player.body[i - 1]
-			}
+			piece_to_follow := (i == 0) ? player.head : player.body[i - 1]
 			distance := vec2_distance(piece_to_follow.position, player.body[i].position)
 			if (distance >= PLAYER_SIZE) {
 				player.body[i].direction = piece_to_follow.direction
@@ -149,28 +152,26 @@ update_player :: proc(player: ^Player) {
 
 			following_ghost_piece := ghost_to_cell(player.ghost_pieces.values[index])
 
-			if ((player.body[i].direction == {0, 0}) &&
-				   aligned(player.body[i].position, following_ghost_piece.position)) {
-
+			if (player.body[i].position == following_ghost_piece.position) {
+				player.body[i].direction = following_ghost_piece.direction
+				player.body[i].count_turns_left -= 1
+			} else {
 				direction_to_ghost := get_cardinal_direction(
 					player.body[i].position,
 					following_ghost_piece.position,
 				)
-				fmt.printf("IDX %d IS FOLLOWING GHOST PIECE\n", i)
-
 				player.body[i].direction = direction_to_ghost
-			} else if (player.body[i].position == following_ghost_piece.position) {
-				player.body[i].direction = following_ghost_piece.direction
-				player.body[i].count_turns_left -= 1
 			}
-		}
 
-		if (i == player.num_cells - 1) {
-			dealing_ghost_piece(player, i)
-		}
 
+			if (i == player.num_cells - 1) {
+				dealing_ghost_piece(player, i)
+			}
+
+		}
 		player.body[i].position.x += player.body[i].direction.x * PLAYER_SPEED
 		player.body[i].position.y += player.body[i].direction.y * PLAYER_SPEED
+
 	}
 }
 
@@ -178,16 +179,6 @@ grow_body :: proc(pj: ^Player) {
 	fmt.println("WE EAT CANDY")
 	direction: vec2_t
 	new_x, new_y: f32
-
-	// if pj.num_cells == 0 {
-	// 	direction = pj.head.direction
-	// 	new_x = pj.head.position.x
-	// 	new_y = pj.head.position.y
-	// } else {
-	// 	pj.body[pj.num_cells - 1].direction
-	// 	new_x = pj.body[pj.num_cells - 1].position.x
-	// 	new_y = pj.body[pj.num_cells - 1].position.y
-	// }
 
 
 	if pj.num_cells == 0 {
@@ -243,7 +234,18 @@ draw_candies :: proc(candies: [MAX_NUM_CANDIES]candy, num_candies: i8) {
 		rl.DrawRectangle(i32(candy.x), i32(candy.y), CANDY_SIZE, CANDY_SIZE, rl.RED)
 	}
 }
+draw_scene :: proc(scene: ^scene_t) {
+	for i in 0 ..< scene.num_colliders {
+		rec := rl.Rectangle {
+			scene.colliders[i].position.x,
+			scene.colliders[i].position.y,
+			scene.colliders[i].w,
+			scene.colliders[i].h,
+		}
+		rl.DrawRectangleRec(rec, rl.YELLOW)
+	}
 
+}
 
 draw_player :: proc(player: ^Player) {
 	rl.DrawRectangle(
@@ -353,6 +355,8 @@ draw_grid :: proc(col: rl.Color) {
 check_collision :: proc(game: ^Game) {
 	player := game.player
 	candies := game.candies
+	colliders := game.scene.colliders
+	num_colliders := game.scene.num_colliders
 
 	for i := game.num_candies - 1; i >= 0; i -= 1 {
 		if rec_colliding(
@@ -371,7 +375,31 @@ check_collision :: proc(game: ^Game) {
 			grow_body(game.player)
 		}
 	}
+
+	for i in 0 ..< game.scene.num_colliders {
+		c := colliders[i]
+
+		future_pos := vec2_add(
+			player.head.position,
+			vec2_mul_scalar(player.head.direction, PLAYER_SPEED),
+		)
+
+		if rec_colliding(c.position, c.w, c.h, future_pos, PLAYER_SIZE, PLAYER_SIZE) {
+			fmt.println("container pos", c.position)
+			fmt.println("future pos ", future_pos)
+			fmt.println("current", player.head.position)
+			player.head.direction = {0, 0}
+
+		}
+	}
 }
+
+// rec_colliding :: proc(v0: vec2_t, w0: f32, h0: f32, v1: vec2_t, w1: f32, h1: f32) -> bool {
+// 	horizontal_in :=
+// 		(v0.x < v1.x && v0.x + w0 > v1.x) || (v0.x < v1.x + w1 && v0.x + w0 > v1.x + w1)
+// 	vertical_in := (v0.y < v1.y && v0.y + h0 > v1.y) || (v0.y < v1.y + h1 && v0.y + h0 > v1.y + h1)
+// 	return horizontal_in && vertical_in
+// }
 
 rec_colliding :: proc(v0: vec2_t, w0: f32, h0: f32, v1: vec2_t, w1: f32, h1: f32) -> bool {
 	horizontal_in :=
@@ -380,6 +408,22 @@ rec_colliding :: proc(v0: vec2_t, w0: f32, h0: f32, v1: vec2_t, w1: f32, h1: f32
 		(v0.y <= v1.y && v0.y + h0 >= v1.y) || (v0.y <= v1.y + h1 && v0.y + h0 >= v1.y + h1)
 	return horizontal_in && vertical_in
 }
+
+
+rec_colliding_no_edges :: proc(
+	v0: vec2_t,
+	w0: f32,
+	h0: f32,
+	v1: vec2_t,
+	w1: f32,
+	h1: f32,
+) -> bool {
+	horizontal_in :=
+		(v0.x < v1.x && v0.x + w0 > v1.x) || (v0.x < v1.x + w1 && v0.x + w0 > v1.x + w1)
+	vertical_in := (v0.y < v1.y && v0.y + h0 > v1.y) || (v0.y < v1.y + h1 && v0.y + h0 > v1.y + h1)
+	return horizontal_in && vertical_in
+}
+
 
 aligned :: proc(v0: vec2_t, v1: vec2_t) -> bool {
 	return v0.x == v1.x || v0.y == v1.y
@@ -467,4 +511,12 @@ TESTING :: proc(game: ^Game) {
 		}
 
 	}
+}
+
+vec2_add :: proc(v0, v1: vec2_t) -> vec2_t {
+	return {v0.x + v1.x, v0.y + v1.y}
+
+}
+vec2_mul_scalar :: proc(v: vec2_t, scalar: f32) -> vec2_t {
+	return {v.x * scalar, v.y * scalar}
 }

@@ -27,7 +27,6 @@ Directions: [4]vec2_t = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}}
 
 Player :: struct {
 	head:             cell_t,
-	prev_dir:         vec2_t,
 	next_dir:         vec2_t,
 	body:             [MAX_NUM_BODY]cell_t,
 	health:           i8,
@@ -41,6 +40,7 @@ Game :: struct {
 	player:      ^Player,
 	candies:     [MAX_NUM_CANDIES]candy,
 	num_candies: i8,
+	scene:       ^scene_t,
 }
 
 
