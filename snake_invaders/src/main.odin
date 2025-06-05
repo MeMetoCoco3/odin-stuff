@@ -39,6 +39,7 @@ main :: proc() {
 		health       = 3,
 		ghost_pieces = &ring_buffer,
 		next_dir     = {0, 0},
+		tight        = false,
 	}
 
 	scene := scene(.ONE)
@@ -46,7 +47,6 @@ main :: proc() {
 	game := Game {
 		player      = &pj,
 		state       = true,
-		candies     = [MAX_NUM_CANDIES]candy{},
 		num_candies = 0,
 		scene       = scene,
 	}
@@ -56,8 +56,12 @@ main :: proc() {
 	for !rl.WindowShouldClose() {
 		if time >= CANDY_RESPAWN_TIME {
 			time = 0
+			fmt.println(game.num_candies, " ", MAX_NUM_CANDIES)
 			if game.num_candies < MAX_NUM_CANDIES {
-				spawn_candy(&game.candies, &game.num_candies)
+				fmt.println(" SPAWN CANDY!!")
+				spawn_candy(&game, &game.num_candies)
+
+
 			}
 		}
 
@@ -68,8 +72,7 @@ main :: proc() {
 
 		draw_player(&pj)
 		draw_ghost_cells(pj.ghost_pieces)
-		draw_candies(game.candies, game.num_candies)
-		draw_scene(game.scene)
+		draw_scene(&game)
 
 		rl.EndDrawing()
 
@@ -105,14 +108,12 @@ get_input :: proc(game: ^Game) {
 }
 
 try_set_dir :: proc(player: ^Player) {
-	// TODO: Allow this movement if bodylength is 0
-
 	prev_dir := player.head.direction
 	next_dir := player.next_dir
 	if !oposite_directions(next_dir, prev_dir) && next_dir != prev_dir {
 		player.head.direction = next_dir
 
-		if player.num_cells > 0 {
+		if player.num_cells > 0 && next_dir != {0, 0} {
 			put_cell(
 				player.ghost_pieces,
 				cell_ghost_t{player.head.position, player.head.direction},
@@ -120,10 +121,6 @@ try_set_dir :: proc(player: ^Player) {
 			add_turn_count(player)
 		}
 	}
-}
-
-aligned_to_grid :: proc(p: vec2_t) -> bool {
-	return i32(p.x) % PLAYER_SIZE == 0 && i32(p.y) % PLAYER_SIZE == 0
 }
 
 update_player :: proc(player: ^Player) {
@@ -134,68 +131,72 @@ update_player :: proc(player: ^Player) {
 	player.head.position.x += player.head.direction.x * PLAYER_SPEED
 	player.head.position.y += player.head.direction.y * PLAYER_SPEED
 
-	for i in 0 ..< player.num_cells {
-		piece_to_follow: cell_t
+	if player.head.direction != {0, 0} {
+		for i in 0 ..< player.num_cells {
 
-		if (player.body[i].count_turns_left == 0) {
-			piece_to_follow := (i == 0) ? player.head : player.body[i - 1]
-			distance := vec2_distance(piece_to_follow.position, player.body[i].position)
-			if (distance >= PLAYER_SIZE) {
+			piece_to_follow: cell_t
+			if (player.body[i].count_turns_left == 0) {
+				piece_to_follow := (i == 0) ? player.head : player.body[i - 1]
+
 				player.body[i].direction = piece_to_follow.direction
-			}
-		} else {
-			index :=
-				(MAX_RINGBUFFER_VALUES +
-					player.ghost_pieces.tail -
-					player.body[i].count_turns_left) %
-				MAX_RINGBUFFER_VALUES
-
-			following_ghost_piece := ghost_to_cell(player.ghost_pieces.values[index])
-
-			if (player.body[i].position == following_ghost_piece.position) {
-				player.body[i].direction = following_ghost_piece.direction
-				player.body[i].count_turns_left -= 1
 			} else {
-				direction_to_ghost := get_cardinal_direction(
-					player.body[i].position,
-					following_ghost_piece.position,
-				)
-				player.body[i].direction = direction_to_ghost
-			}
+				index :=
+					(MAX_RINGBUFFER_VALUES +
+						player.ghost_pieces.tail -
+						player.body[i].count_turns_left) %
+					MAX_RINGBUFFER_VALUES
+
+				following_ghost_piece := ghost_to_cell(player.ghost_pieces.values[index])
+
+				if (player.body[i].position == following_ghost_piece.position) {
+					player.body[i].direction = following_ghost_piece.direction
+					player.body[i].count_turns_left -= 1
+				} else {
+					direction_to_ghost := get_cardinal_direction(
+						player.body[i].position,
+						following_ghost_piece.position,
+					)
+					player.body[i].direction = direction_to_ghost
+				}
 
 
-			if (i == player.num_cells - 1) {
-				dealing_ghost_piece(player, i)
+				if (i == player.num_cells - 1) {
+					dealing_ghost_piece(player, i)
+				}
+
 			}
+			player.body[i].position.x += player.body[i].direction.x * PLAYER_SPEED
+			player.body[i].position.y += player.body[i].direction.y * PLAYER_SPEED
 
 		}
-		player.body[i].position.x += player.body[i].direction.x * PLAYER_SPEED
-		player.body[i].position.y += player.body[i].direction.y * PLAYER_SPEED
-
 	}
 }
 
 grow_body :: proc(pj: ^Player) {
 	fmt.println("WE EAT CANDY")
-	direction: vec2_t
-	new_x, new_y: f32
+
+	if pj.num_cells < MAX_NUM_BODY {
+		direction: vec2_t
+		new_x, new_y: f32
 
 
-	if pj.num_cells == 0 {
-		direction = pj.head.direction
-		new_x = pj.head.position.x - direction.x * PLAYER_SIZE
-		new_y = pj.head.position.y - direction.y * PLAYER_SIZE
+		if pj.num_cells == 0 {
+			direction = pj.head.direction
+			new_x = pj.head.position.x - direction.x * PLAYER_SIZE
+			new_y = pj.head.position.y - direction.y * PLAYER_SIZE
+		} else {
+			last := pj.body[pj.num_cells - 1]
+			direction = last.direction
+			new_x = last.position.x - direction.x * PLAYER_SIZE
+			new_y = last.position.y - direction.y * PLAYER_SIZE
+		}
+		num_ghost_pieces := pj.ghost_pieces.count
+		new_cell := cell_t{{new_x, new_y}, direction, num_ghost_pieces, 2}
+		pj.body[pj.num_cells] = new_cell
+		pj.num_cells += 1
 	} else {
-		last := pj.body[pj.num_cells - 1]
-		direction = last.direction
-		new_x = last.position.x - direction.x * PLAYER_SIZE
-		new_y = last.position.y - direction.y * PLAYER_SIZE
+		fmt.println("WE DO NOT GROW!")
 	}
-	// TODO: put limit here
-	num_ghost_pieces := pj.ghost_pieces.count
-	new_cell := cell_t{{new_x, new_y}, direction, num_ghost_pieces, 2}
-	pj.body[pj.num_cells] = new_cell
-	pj.num_cells += 1
 }
 
 dealing_ghost_piece :: proc(player: ^Player, last_piece: i8) {
@@ -219,32 +220,53 @@ dealing_ghost_piece :: proc(player: ^Player, last_piece: i8) {
 }
 
 
-spawn_candy :: proc(candies: ^[MAX_NUM_CANDIES]candy, num_candies: ^i8) {
-	new_candy := candy{rand.float32() * SCREEN_WIDTH, rand.float32() * SCREEN_HEIGHT}
-	candies[num_candies^] = new_candy
+spawn_candy :: proc(game: ^Game, num_candies: ^i8) {
+
+	idx := game.scene.num_colliders + int(num_candies^)
+	collider := new(collider_t)
+	collider.position = {rand.float32() * SCREEN_WIDTH, rand.float32() * SCREEN_HEIGHT}
+
+	collider.position.x = clamp(
+		collider.position.x,
+		PLAYER_SIZE * 2,
+		SCREEN_WIDTH - PLAYER_SIZE * 2,
+	)
+	collider.position.y = clamp(
+		collider.position.y,
+		PLAYER_SIZE * 2,
+		SCREEN_HEIGHT - PLAYER_SIZE * 2,
+	)
+	collider.w = CANDY_SIZE
+	collider.h = CANDY_SIZE
+	collider.kind = .CANDY
+	game.scene.colliders[idx] = collider^
 	num_candies^ += 1
 }
 
 ////////////
 // RENDER //
-////////////
-draw_candies :: proc(candies: [MAX_NUM_CANDIES]candy, num_candies: i8) {
-	for i in 0 ..< num_candies {
-		candy := candies[i]
-		rl.DrawRectangle(i32(candy.x), i32(candy.y), CANDY_SIZE, CANDY_SIZE, rl.RED)
-	}
-}
-draw_scene :: proc(scene: ^scene_t) {
-	for i in 0 ..< scene.num_colliders {
-		rec := rl.Rectangle {
-			scene.colliders[i].position.x,
-			scene.colliders[i].position.y,
-			scene.colliders[i].w,
-			scene.colliders[i].h,
-		}
-		rl.DrawRectangleRec(rec, rl.YELLOW)
-	}
+// ////////////
 
+draw_scene :: proc(game: ^Game) {
+	num_colliders := game.scene.num_colliders + int(game.num_candies)
+	for i in 0 ..< num_colliders {
+		rec := rl.Rectangle {
+			game.scene.colliders[i].position.x,
+			game.scene.colliders[i].position.y,
+			game.scene.colliders[i].w,
+			game.scene.colliders[i].h,
+		}
+		color: rl.Color
+		#partial switch game.scene.colliders[i].kind {
+		case .STATIC:
+			color = rl.YELLOW
+		case .CANDY:
+			color = rl.RED
+		case .BULLET:
+			color = rl.BLUE
+		}
+		rl.DrawRectangleRec(rec, color)
+	}
 }
 
 draw_player :: proc(player: ^Player) {
@@ -255,6 +277,7 @@ draw_player :: proc(player: ^Player) {
 		PLAYER_SIZE,
 		rl.GREEN,
 	)
+
 	for i in 0 ..< player.num_cells {
 		cell := player.body[i]
 		if cell.size < PLAYER_SIZE {
@@ -354,52 +377,48 @@ draw_grid :: proc(col: rl.Color) {
 /////////////
 check_collision :: proc(game: ^Game) {
 	player := game.player
-	candies := game.candies
 	colliders := game.scene.colliders
-	num_colliders := game.scene.num_colliders
 
-	for i := game.num_candies - 1; i >= 0; i -= 1 {
-		if rec_colliding(
-			player.head.position,
-			PLAYER_SIZE,
-			PLAYER_SIZE,
-			candies[i],
-			CANDY_SIZE,
-			CANDY_SIZE,
-		) {
-			// If is not the last, we take the last and put it on new place, then we clamp
-			if i != game.num_candies - 1 {
-				game.candies[i] = game.candies[game.num_candies - 1]
-			}
-			game.num_candies -= 1
-			grow_body(game.player)
-		}
-	}
+	future_pos := vec2_add(player.head.position, vec2_mul_scalar(player.next_dir, PLAYER_SPEED))
+	num_colliders := game.scene.num_colliders + int(game.num_candies)
 
-	for i in 0 ..< game.scene.num_colliders {
+	for i in 0 ..< num_colliders {
 		c := colliders[i]
+		if c.kind != .STATIC {
+			#partial switch c.kind {
+			case .CANDY:
+				if rec_colliding(
+					player.head.position,
+					PLAYER_SIZE,
+					PLAYER_SIZE,
+					colliders[i].position,
+					CANDY_SIZE,
+					CANDY_SIZE,
+				) {
+					// If is not the last, we take the last and put it on new place, then we clamp
+					if i != int(game.num_candies - 1) {
+						game.scene.colliders[i] =
+							game.scene.colliders[int(game.num_candies) + game.scene.num_colliders - 1]
+					}
+					game.num_candies -= 1
+					grow_body(game.player)
+				}
 
-		future_pos := vec2_add(
-			player.head.position,
-			vec2_mul_scalar(player.head.direction, PLAYER_SPEED),
-		)
-
-		if rec_colliding(c.position, c.w, c.h, future_pos, PLAYER_SIZE, PLAYER_SIZE) {
-			fmt.println("container pos", c.position)
-			fmt.println("future pos ", future_pos)
-			fmt.println("current", player.head.position)
-			player.head.direction = {0, 0}
-
+			// WARN: I DO NOT COLLIDE WITH BULLETS!
+			// case .BULLET
+			}} else {
+			if rec_colliding_no_edges(c.position, c.w, c.h, future_pos, PLAYER_SIZE, PLAYER_SIZE) {
+				player.next_dir = {0, 0}
+				fmt.println()
+			}
 		}
 	}
 }
 
-// rec_colliding :: proc(v0: vec2_t, w0: f32, h0: f32, v1: vec2_t, w1: f32, h1: f32) -> bool {
-// 	horizontal_in :=
-// 		(v0.x < v1.x && v0.x + w0 > v1.x) || (v0.x < v1.x + w1 && v0.x + w0 > v1.x + w1)
-// 	vertical_in := (v0.y < v1.y && v0.y + h0 > v1.y) || (v0.y < v1.y + h1 && v0.y + h0 > v1.y + h1)
-// 	return horizontal_in && vertical_in
-// }
+aligned_to_grid :: proc(p: vec2_t) -> bool {
+	return i32(p.x) % PLAYER_SIZE == 0 && i32(p.y) % PLAYER_SIZE == 0
+}
+
 
 rec_colliding :: proc(v0: vec2_t, w0: f32, h0: f32, v1: vec2_t, w1: f32, h1: f32) -> bool {
 	horizontal_in :=

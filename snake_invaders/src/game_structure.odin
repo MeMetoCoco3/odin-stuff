@@ -1,29 +1,25 @@
 package main
 import "core:fmt"
 
+
 vec2_t :: struct {
 	x, y: f32,
 }
 
-candy :: vec2_t
+candy :: struct {
+	collider: collider_t,
+}
 
 cell_t :: struct {
 	position, direction: vec2_t,
 	count_turns_left:    i8,
 	size:                i8,
 }
+
 cell_ghost_t :: struct {
 	position, direction: vec2_t,
 }
 
-DIR_IDX :: enum {
-	UP,
-	DOWN,
-	LEFT,
-	RIGHT,
-}
-
-Directions: [4]vec2_t = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}}
 
 Player :: struct {
 	head:             cell_t,
@@ -33,19 +29,14 @@ Player :: struct {
 	num_cells:        i8,
 	num_ghost_pieces: i8,
 	ghost_pieces:     ^Ringuffer_t,
+	tight:            bool,
 }
 
 Game :: struct {
 	state:       bool,
 	player:      ^Player,
-	candies:     [MAX_NUM_CANDIES]candy,
 	num_candies: i8,
 	scene:       ^scene_t,
-}
-
-
-get_direction :: proc(idx: DIR_IDX) -> vec2_t {
-	return Directions[idx]
 }
 
 
