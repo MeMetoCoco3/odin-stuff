@@ -6,8 +6,10 @@ SCENES :: enum {
 
 
 scene_t :: struct {
-	colliders:     []collider_t,
-	num_colliders: int,
+	colliders:             []collider_t,
+	num_initial_colliders: int,
+	movers:                []mover_t,
+	num_movers:            int,
 	// enemies ...
 }
 
@@ -30,7 +32,8 @@ scene :: proc(s: SCENES) -> ^scene_t {
 	}
 
 	s.colliders = colliders
-	s.num_colliders = cnt
-	return s
+	s.num_initial_colliders = cnt
+	s.movers = make([]mover_t, MAX_NUM_COLLIDERS)
 
+	return s
 }

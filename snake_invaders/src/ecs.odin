@@ -16,3 +16,10 @@ collider_t :: struct {
 	w, h:     f32,
 	kind:     COLLIDER_TYPE,
 }
+
+mover_t :: struct {
+	position:  vec2_t,
+	direction: vec2_t,
+	speed:     f32,
+	kind:      COLLIDER_TYPE,
+}

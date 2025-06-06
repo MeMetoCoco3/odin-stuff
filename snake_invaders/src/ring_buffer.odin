@@ -21,6 +21,7 @@ put_cell :: proc(rb: ^Ringuffer_t, cell: cell_ghost_t) {
 	rb.count += 1
 }
 
+
 pop_cell :: proc(rb: ^Ringuffer_t) -> (cell_ghost_t, bool) {
 	if rb.count == 0 {
 		return cell_ghost_t{}, false

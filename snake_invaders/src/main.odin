@@ -9,12 +9,15 @@ import rl "vendor:raylib"
 SCREEN_WIDTH :: 800
 SCREEN_HEIGHT :: 800
 PLAYER_SIZE :: 20
-PLAYER_SPEED :: 4
+PLAYER_SPEED :: 2
 MAX_NUM_BODY :: 20
-
+MAX_NUM_MOVERS :: 100
 MAX_NUM_CANDIES :: 10
 CANDY_SIZE :: 20
 CANDY_RESPAWN_TIME :: 20
+
+BULLET_SPEED :: 4
+BULLET_SIZE :: 16
 
 main :: proc() {
 	rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "snake_invaders")
@@ -39,7 +42,6 @@ main :: proc() {
 		health       = 3,
 		ghost_pieces = &ring_buffer,
 		next_dir     = {0, 0},
-		tight        = false,
 	}
 
 	scene := scene(.ONE)
@@ -48,6 +50,7 @@ main :: proc() {
 		player      = &pj,
 		state       = true,
 		num_candies = 0,
+		num_bullets = 0,
 		scene       = scene,
 	}
 
@@ -55,17 +58,13 @@ main :: proc() {
 
 	for !rl.WindowShouldClose() {
 		if time >= CANDY_RESPAWN_TIME {
-			time = 0
-			fmt.println(game.num_candies, " ", MAX_NUM_CANDIES)
 			if game.num_candies < MAX_NUM_CANDIES {
-				fmt.println(" SPAWN CANDY!!")
 				spawn_candy(&game, &game.num_candies)
-
-
 			}
 		}
 
 		update(&game)
+
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.BLACK)
 		draw_grid({100, 100, 100, 255})
@@ -88,7 +87,7 @@ update :: proc(game: ^Game) {
 	get_input(game)
 	check_collision(game)
 	update_player(game.player)
-
+	update_scene(game)
 	TESTING(game)
 }
 
@@ -105,6 +104,10 @@ get_input :: proc(game: ^Game) {
 	if (rl.IsKeyPressed(.K) || rl.IsKeyPressed(.UP)) {
 		game.player.next_dir = {0, -1}
 	}
+	if (rl.IsKeyPressed(.SPACE)) {
+		// TODO: primero chekea los resultados sin moverte, luego muevete y dispara y chekea
+		spawn_bullet(game, &game.num_bullets)
+	}
 }
 
 try_set_dir :: proc(player: ^Player) {
@@ -112,7 +115,6 @@ try_set_dir :: proc(player: ^Player) {
 	next_dir := player.next_dir
 	if !oposite_directions(next_dir, prev_dir) && next_dir != prev_dir {
 		player.head.direction = next_dir
-
 		if player.num_cells > 0 && next_dir != {0, 0} {
 			put_cell(
 				player.ghost_pieces,
@@ -121,6 +123,24 @@ try_set_dir :: proc(player: ^Player) {
 			add_turn_count(player)
 		}
 	}
+}
+
+update_scene :: proc(game: ^Game) {
+	movers := game.scene.movers
+	for i in 0 ..< game.scene.num_movers {
+		#partial switch movers[i].kind {
+		case .BULLET:
+			fmt.println(movers[i].direction)
+			game.scene.movers[i].position.x += movers[i].direction.x
+			game.scene.movers[i].position.y += movers[i].direction.y
+			idx_collider := i + game.scene.num_initial_colliders + MAX_NUM_CANDIES
+			game.scene.colliders[idx_collider].position = game.scene.movers[i].position
+		case .CANDY:
+
+		}
+
+	}
+
 }
 
 update_player :: proc(player: ^Player) {
@@ -173,7 +193,6 @@ update_player :: proc(player: ^Player) {
 }
 
 grow_body :: proc(pj: ^Player) {
-	fmt.println("WE EAT CANDY")
 
 	if pj.num_cells < MAX_NUM_BODY {
 		direction: vec2_t
@@ -218,11 +237,67 @@ dealing_ghost_piece :: proc(player: ^Player, last_piece: i8) {
 		pop_cell(player.ghost_pieces)
 	}
 }
+// TODO: Dont pass the NUM by reference
 
+spawn_bullet :: proc(game: ^Game, num_bullets: ^i8) {
+	if game.player.num_cells > 0 {
+		idx_collider := game.scene.num_initial_colliders + MAX_NUM_CANDIES + int(game.num_bullets)
+		idx_mover := 0 + int(game.num_bullets)
+		head := game.player.head
+		x_position: f32
+		y_position: f32
+		fmt.println(head.direction)
+		switch game.player.head.direction {
+		case {0, 1}:
+			x_position = head.position.x + (PLAYER_SIZE / 2)
+			y_position = head.position.y + PLAYER_SIZE
+		case {0, -1}:
+			x_position = head.position.x + (PLAYER_SIZE / 2)
+			y_position = head.position.y
+		case {1, 0}:
+			x_position = head.position.x + PLAYER_SIZE
+			y_position = head.position.y + (PLAYER_SIZE / 2)
+		case {-1, 0}:
+			x_position = head.position.x
+			y_position = head.position.y + (PLAYER_SIZE / 2)
+		}
+
+		collider := new(collider_t)
+		collider.position = {x_position, y_position}
+		collider.w = BULLET_SIZE
+		collider.h = BULLET_SIZE
+		collider.kind = .BULLET
+
+		game.scene.colliders[idx_collider] = collider^
+
+		mover := new(mover_t)
+		mover.direction = head.direction
+		mover.position = {x_position, y_position}
+		mover.speed = BULLET_SPEED
+		mover.kind = .BULLET
+		game.scene.movers[idx_mover] = mover^
+
+		game.scene.num_movers += 1
+		game.num_bullets += 1
+
+		last_cell := game.player.body[game.player.num_cells - 1]
+		last_ghost, ok := peek_cell(game.player.ghost_pieces)
+		if ok &&
+		   last_cell.count_turns_left <= 1 &&
+		   vec2_distance(last_cell.position, last_ghost.position) < PLAYER_SIZE {
+			pop_cell(game.player.ghost_pieces)
+		}
+
+		game.player.num_cells -= 1
+
+		//TODO: CHECK FOR GHOST PIECES WITH NO PARENTS 
+	}
+}
 
 spawn_candy :: proc(game: ^Game, num_candies: ^i8) {
 
-	idx := game.scene.num_colliders + int(num_candies^)
+
+	idx := game.scene.num_initial_colliders + int(num_candies^)
 	collider := new(collider_t)
 	collider.position = {rand.float32() * SCREEN_WIDTH, rand.float32() * SCREEN_HEIGHT}
 
@@ -241,6 +316,8 @@ spawn_candy :: proc(game: ^Game, num_candies: ^i8) {
 	collider.kind = .CANDY
 	game.scene.colliders[idx] = collider^
 	num_candies^ += 1
+
+
 }
 
 ////////////
@@ -248,7 +325,8 @@ spawn_candy :: proc(game: ^Game, num_candies: ^i8) {
 // ////////////
 
 draw_scene :: proc(game: ^Game) {
-	num_colliders := game.scene.num_colliders + int(game.num_candies)
+	num_colliders :=
+		game.scene.num_initial_colliders + int(game.num_candies) + int(game.num_bullets)
 	for i in 0 ..< num_colliders {
 		rec := rl.Rectangle {
 			game.scene.colliders[i].position.x,
@@ -309,24 +387,18 @@ draw_player :: proc(player: ^Player) {
 			case {0, 1}:
 				x_position = piece_to_follow.position.x
 				y_position = piece_to_follow.position.y - f32(cell.size)
-				cell_size_x = PLAYER_SIZE
-				cell_size_y = cell.size
 			case {0, -1}:
 				x_position = piece_to_follow.position.x
 				y_position = piece_to_follow.position.y + PLAYER_SIZE
-				cell_size_x = PLAYER_SIZE
-				cell_size_y = cell.size
 			case {1, 0}:
 				x_position = piece_to_follow.position.x - f32(cell.size)
 				y_position = piece_to_follow.position.y
-				cell_size_x = cell.size
-				cell_size_y = PLAYER_SIZE
 			case {-1, 0}:
 				x_position = piece_to_follow.position.x + PLAYER_SIZE
 				y_position = piece_to_follow.position.y
-				cell_size_x = cell.size
-				cell_size_y = PLAYER_SIZE
 			}
+			cell_size_x = PLAYER_SIZE
+			cell_size_y = cell.size
 			rl.DrawRectangle(
 				i32(x_position),
 				i32(y_position),
@@ -380,14 +452,14 @@ check_collision :: proc(game: ^Game) {
 	colliders := game.scene.colliders
 
 	future_pos := vec2_add(player.head.position, vec2_mul_scalar(player.next_dir, PLAYER_SPEED))
-	num_colliders := game.scene.num_colliders + int(game.num_candies)
+	num_initial_colliders := game.scene.num_initial_colliders + int(game.num_candies)
 
-	for i in 0 ..< num_colliders {
+	for i in 0 ..< num_initial_colliders {
 		c := colliders[i]
 		if c.kind != .STATIC {
 			#partial switch c.kind {
 			case .CANDY:
-				if rec_colliding(
+				if rec_colliding_no_edges(
 					player.head.position,
 					PLAYER_SIZE,
 					PLAYER_SIZE,
@@ -398,7 +470,7 @@ check_collision :: proc(game: ^Game) {
 					// If is not the last, we take the last and put it on new place, then we clamp
 					if i != int(game.num_candies - 1) {
 						game.scene.colliders[i] =
-							game.scene.colliders[int(game.num_candies) + game.scene.num_colliders - 1]
+							game.scene.colliders[int(game.num_candies) + game.scene.num_initial_colliders - 1]
 					}
 					game.num_candies -= 1
 					grow_body(game.player)

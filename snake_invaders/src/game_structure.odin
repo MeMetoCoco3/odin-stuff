@@ -29,13 +29,13 @@ Player :: struct {
 	num_cells:        i8,
 	num_ghost_pieces: i8,
 	ghost_pieces:     ^Ringuffer_t,
-	tight:            bool,
 }
 
 Game :: struct {
 	state:       bool,
 	player:      ^Player,
 	num_candies: i8,
+	num_bullets: i8,
 	scene:       ^scene_t,
 }
 
