@@ -47,19 +47,21 @@ main :: proc() {
 	scene := scene(.ONE)
 
 	game := Game {
-		player      = &pj,
-		state       = true,
-		num_candies = 0,
-		num_bullets = 0,
-		scene       = scene,
+		player = &pj,
+		state  = true,
+		scene  = scene,
 	}
 
 	time := 0
 
 	for !rl.WindowShouldClose() {
 		if time >= CANDY_RESPAWN_TIME {
-			if game.num_candies < MAX_NUM_CANDIES {
-				spawn_candy(&game, &game.num_candies)
+			time = 0
+			for i in 0 ..< MAX_NUM_CANDIES {
+				index_candy := game.scene.num_initial_colliders + i
+				if game.scene.colliders[index_candy].state == .DEAD {
+					spawn_candy()
+				}
 			}
 		}
 
@@ -193,7 +195,6 @@ update_player :: proc(player: ^Player) {
 }
 
 grow_body :: proc(pj: ^Player) {
-
 	if pj.num_cells < MAX_NUM_BODY {
 		direction: vec2_t
 		new_x, new_y: f32
@@ -237,86 +238,68 @@ dealing_ghost_piece :: proc(player: ^Player, last_piece: i8) {
 		pop_cell(player.ghost_pieces)
 	}
 }
-// TODO: Dont pass the NUM by reference
 
-spawn_bullet :: proc(game: ^Game, num_bullets: ^i8) {
-	if game.player.num_cells > 0 {
-		idx_collider := game.scene.num_initial_colliders + MAX_NUM_CANDIES + int(game.num_bullets)
-		idx_mover := 0 + int(game.num_bullets)
-		head := game.player.head
-		x_position: f32
-		y_position: f32
-		fmt.println(head.direction)
-		switch game.player.head.direction {
-		case {0, 1}:
-			x_position = head.position.x + (PLAYER_SIZE / 2)
-			y_position = head.position.y + PLAYER_SIZE
-		case {0, -1}:
-			x_position = head.position.x + (PLAYER_SIZE / 2)
-			y_position = head.position.y
-		case {1, 0}:
-			x_position = head.position.x + PLAYER_SIZE
-			y_position = head.position.y + (PLAYER_SIZE / 2)
-		case {-1, 0}:
-			x_position = head.position.x
-			y_position = head.position.y + (PLAYER_SIZE / 2)
-		}
-
-		collider := new(collider_t)
-		collider.position = {x_position, y_position}
-		collider.w = BULLET_SIZE
-		collider.h = BULLET_SIZE
-		collider.kind = .BULLET
-
-		game.scene.colliders[idx_collider] = collider^
-
-		mover := new(mover_t)
-		mover.direction = head.direction
-		mover.position = {x_position, y_position}
-		mover.speed = BULLET_SPEED
-		mover.kind = .BULLET
-		game.scene.movers[idx_mover] = mover^
-
-		game.scene.num_movers += 1
-		game.num_bullets += 1
-
-		last_cell := game.player.body[game.player.num_cells - 1]
-		last_ghost, ok := peek_cell(game.player.ghost_pieces)
-		if ok &&
-		   last_cell.count_turns_left <= 1 &&
-		   vec2_distance(last_cell.position, last_ghost.position) < PLAYER_SIZE {
-			pop_cell(game.player.ghost_pieces)
-		}
-
-		game.player.num_cells -= 1
-
-		//TODO: CHECK FOR GHOST PIECES WITH NO PARENTS 
+spawn_bullet :: proc(bullet_c: ^collider_t, bullet_m: ^mover_t, player: ^Player) {
+	//TODO: PASS THIS CHECK OUTSIDE 
+	// if game.player.num_cells > 0 {
+	// idx_collider := game.scene.num_initial_colliders + MAX_NUM_CANDIES + int(game.num_bullets)
+	// idx_mover := 0 + int(game.num_bullets)
+	head := player.head
+	x_position: f32
+	y_position: f32
+	switch head.direction {
+	case {0, 1}:
+		x_position = head.position.x + (PLAYER_SIZE / 2)
+		y_position = head.position.y + PLAYER_SIZE
+	case {0, -1}:
+		x_position = head.position.x + (PLAYER_SIZE / 2)
+		y_position = head.position.y
+	case {1, 0}:
+		x_position = head.position.x + PLAYER_SIZE
+		y_position = head.position.y + (PLAYER_SIZE / 2)
+	case {-1, 0}:
+		x_position = head.position.x
+		y_position = head.position.y + (PLAYER_SIZE / 2)
 	}
+
+	bullet_c.position = {x_position, y_position}
+	bullet_c.w = BULLET_SIZE
+	bullet_c.h = BULLET_SIZE
+	bullet_c.kind = .BULLET
+	bullet_c.state = .ALIVE
+
+	mover := new(mover_t)
+	mover.direction = head.direction
+	mover.position = {x_position, y_position}
+	mover.speed = BULLET_SPEED
+	mover.kind = .BULLET
+
+
+	last_cell := game.player.body[game.player.num_cells - 1]
+	last_ghost, ok := peek_cell(game.player.ghost_pieces)
+	if ok &&
+	   last_cell.count_turns_left <= 1 &&
+	   vec2_distance(last_cell.position, last_ghost.position) < PLAYER_SIZE {
+		pop_cell(game.player.ghost_pieces)
+	}
+
+	game.player.num_cells -= 1
+
+	//TODO: CHECK FOR GHOST PIECES WITH NO PARENTS 
 }
 
-spawn_candy :: proc(game: ^Game, num_candies: ^i8) {
+spawn_candy :: proc(candy: ^collider_t) {
+	x_position := (int(rand.float32() * SCREEN_WIDTH) % PLAYER_SIZE) * PLAYER_SIZE * 2
+	y_position := (int(rand.float32() * SCREEN_HEIGHT) % PLAYER_SIZE) * PLAYER_SIZE * 2
 
+	candy.position = {f32(x_position), f32(y_position)}
 
-	idx := game.scene.num_initial_colliders + int(num_candies^)
-	collider := new(collider_t)
-	collider.position = {rand.float32() * SCREEN_WIDTH, rand.float32() * SCREEN_HEIGHT}
-
-	collider.position.x = clamp(
-		collider.position.x,
-		PLAYER_SIZE * 2,
-		SCREEN_WIDTH - PLAYER_SIZE * 2,
-	)
-	collider.position.y = clamp(
-		collider.position.y,
-		PLAYER_SIZE * 2,
-		SCREEN_HEIGHT - PLAYER_SIZE * 2,
-	)
-	collider.w = CANDY_SIZE
-	collider.h = CANDY_SIZE
-	collider.kind = .CANDY
-	game.scene.colliders[idx] = collider^
-	num_candies^ += 1
-
+	candy.position.x = clamp(candy.position.x, PLAYER_SIZE * 2, SCREEN_WIDTH - PLAYER_SIZE * 2)
+	candy.position.y = clamp(candy.position.y, PLAYER_SIZE * 2, SCREEN_HEIGHT - PLAYER_SIZE * 2)
+	candy.w = CANDY_SIZE
+	candy.h = CANDY_SIZE
+	candy.kind = .CANDY
+	candy.state = .ALIVE
 
 }
 
@@ -328,6 +311,10 @@ draw_scene :: proc(game: ^Game) {
 	num_colliders :=
 		game.scene.num_initial_colliders + int(game.num_candies) + int(game.num_bullets)
 	for i in 0 ..< num_colliders {
+		if game.scene.colliders[i].state == .DEAD {
+			continue
+		}
+
 		rec := rl.Rectangle {
 			game.scene.colliders[i].position.x,
 			game.scene.colliders[i].position.y,
@@ -459,21 +446,38 @@ check_collision :: proc(game: ^Game) {
 		if c.kind != .STATIC {
 			#partial switch c.kind {
 			case .CANDY:
-				if rec_colliding_no_edges(
-					player.head.position,
-					PLAYER_SIZE,
-					PLAYER_SIZE,
-					colliders[i].position,
-					CANDY_SIZE,
-					CANDY_SIZE,
-				) {
+				// CHECK DISTANCE BETWEEN 2 CENTERS IS LESS THAN PLAYER SIZE
+
+				//
+				// if rec_colliding_no_edges(
+				// 	player.head.position,
+				// 	PLAYER_SIZE,
+				// 	PLAYER_SIZE,
+				// 	colliders[i].position,
+				// 	CANDY_SIZE,
+				// 	CANDY_SIZE,
+				// ) 
+
+
+				center_player := player.head.position
+				center_player.x += PLAYER_SIZE / 2
+				center_player.y += PLAYER_SIZE / 2
+
+				center_candy := c.position
+				center_candy.x += CANDY_SIZE / 2
+				center_candy.y += CANDY_SIZE / 2
+				if vec2_distance(center_player, center_candy) < PLAYER_SIZE && c.state != .DEAD {
+					fmt.println("PLAYER", center_player)
+					fmt.println("CANDY", center_candy)
 					// If is not the last, we take the last and put it on new place, then we clamp
-					if i != int(game.num_candies - 1) {
-						game.scene.colliders[i] =
-							game.scene.colliders[int(game.num_candies) + game.scene.num_initial_colliders - 1]
-					}
+					// if i != int(game.num_candies - 1) {
+					// 	game.scene.colliders[i] =
+					// 		game.scene.colliders[int(game.num_candies) + game.scene.num_initial_colliders - 1]
+					// }
+
 					game.num_candies -= 1
 					grow_body(game.player)
+					colliders[i].state = .DEAD
 				}
 
 			// WARN: I DO NOT COLLIDE WITH BULLETS!
@@ -481,7 +485,6 @@ check_collision :: proc(game: ^Game) {
 			}} else {
 			if rec_colliding_no_edges(c.position, c.w, c.h, future_pos, PLAYER_SIZE, PLAYER_SIZE) {
 				player.next_dir = {0, 0}
-				fmt.println()
 			}
 		}
 	}

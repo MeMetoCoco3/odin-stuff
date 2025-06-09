@@ -20,10 +20,22 @@ scene :: proc(s: SCENES) -> ^scene_t {
 	colliders := make([]collider_t, MAX_NUM_COLLIDERS)
 
 	colliders_slice := []collider_t {
-		{position = {0, 0}, w = SCREEN_WIDTH, h = 20, kind = .STATIC},
-		{position = {0, SCREEN_HEIGHT - 20}, w = SCREEN_WIDTH, h = 20, kind = .STATIC},
-		{position = {0, 0}, w = 20, h = SCREEN_HEIGHT, kind = .STATIC},
-		{position = {SCREEN_WIDTH - 20, 0}, w = 20, h = SCREEN_HEIGHT, kind = .STATIC},
+		{position = {0, 0}, w = SCREEN_WIDTH, h = 20, kind = .STATIC, state = .ALIVE},
+		{
+			position = {0, SCREEN_HEIGHT - 20},
+			w = SCREEN_WIDTH,
+			h = 20,
+			kind = .STATIC,
+			state = .ALIVE,
+		},
+		{position = {0, 0}, w = 20, h = SCREEN_HEIGHT, kind = .STATIC, state = .ALIVE},
+		{
+			position = {SCREEN_WIDTH - 20, 0},
+			w = 20,
+			h = SCREEN_HEIGHT,
+			kind = .STATIC,
+			state = .ALIVE,
+		},
 	}
 	cnt := 0
 	for i in 0 ..< len(colliders_slice) {

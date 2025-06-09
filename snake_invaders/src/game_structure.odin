@@ -32,11 +32,9 @@ Player :: struct {
 }
 
 Game :: struct {
-	state:       bool,
-	player:      ^Player,
-	num_candies: i8,
-	num_bullets: i8,
-	scene:       ^scene_t,
+	state:  bool,
+	player: ^Player,
+	scene:  ^scene_t,
 }
 
 
