@@ -30,6 +30,7 @@ Para chekear los simbolos:
     info locals
 Para poner un breakpoint:
     break main::func
+    break somefile.odin:321
 Para poner un condicional:
     cond 1 someshit == whatever
 

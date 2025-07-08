@@ -1,0 +1,7 @@
+[INFO ] --- [2025-07-08 21:34:32] [context.odin:67:main()] First line
+[INFO ] --- [2025-07-08 21:34:32] [context.odin:68:main()] Second line
+[INFO ] --- [2025-07-08 21:34:32] [context.odin:69:main()] Third line
+IM PRINTLN
+[INFO ] --- [2025-07-08 21:34:32] [context.odin:71:main()] Fourth line
+[ERROR] --- [2025-07-08 21:34:32] [context.odin:72:main()] Some error happend
+[FATAL] --- [2025-07-08 21:34:32] [context.odin:74:main()] COLLISION SYSTEM BROKE
