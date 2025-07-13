@@ -5,7 +5,8 @@
 # 	@odin build  ./files/init_window.odin -file -out:odin -debug 
 # 	@odin run 
 f:
-	odin run ./files/$(file)
+	odin build ./files/$(f) -file -out:./$(f)
+	./$(f)
 run:
 	odin run .
 clear:

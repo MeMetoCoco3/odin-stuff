@@ -1,5 +1,52 @@
 # odin-stuff
 
+## Arenas
+En odin podemos usar 3 implementaciones definidas en:
+- core:mem/
+- core:mem/virtual
+- base:runtime
+Es general usaremos virtual, pero ciertas plataformas no permiten el uso de virtual memory, como WASM.
+El declarado en runtime no deberia ser usado en otro lugar que en temp allocations, ya que usa virtual memory, haciendolo menos eficiente.
+
+Cuando usamos memoria virtual significa que el os sabe que un bloque de memoria va a ser utilizado, y por lo tanto se reserva, pero, el programa no esta utilizando toda esta memoria, el uso de memoria de nuestro programa solo aumentara conforme reservemos memroria para nuestros datos. Si tenemos un bloque de 13 gigas y reservamos un u32, solo estaremos usando 4 bytes. 
+```odin
+    Arena :: struct {
+        kind:                Arena_Kind,
+        curr_block:          ^Memory_Block,
+
+        total_used:          uint,
+        total_reserved:      uint,
+
+        default_commit_size: uint, // commit size <= reservation size
+        minimum_block_size:  uint, // block size == total reservation
+
+        temp_count:          uint,
+        mutex:               sync.Mutex,
+    }
+```
+
+### Diferentes tipos de Arena
+```odin
+    Arena_Kind :: enum uint {
+        Growing = 0, // Chained memory blocks (singly linked list).
+        Static  = 1, // Fixed reservation sized.
+        Buffer  = 2, // Uses a fixed sized buffer.
+    }
+
+    arena : vmem.Arena
+    err := vmem.arena_init_growing(&arena, 100*mem.Megabyte)
+    err := vmem.arena_init_static(&arena, 100*mem.Megabyte)
+    vmem.arena_destroy(&arena) 
+
+    buf := make([]byte, 10*mem.Megabyte)
+    err := vmem.arena_init_buffer(&arena, [:]buf)
+    delete(buf)
+```
+
+- Growing: Usa blockes de memoria de el tamaño que pidamos, a partir de cierto momento, pedira al OS otro bloke para poder seguir reservando memoria una vez el primero este lleno, o una vez reservemos espacio mayor al que tenemos disponible en le bloque.
+- Static: Es igual, pero este no va a reservar mas bloques si es necesario.
+- Buffer: Igual que static, pero sin usar memoria virtual. TAMBIEN podemos darle una fixed array declarada en el stack. Para destruirlo usaremos delete en el buffer.
+
 
 ## Custom iterators
 Para declarar un custo iterator necesitamos
