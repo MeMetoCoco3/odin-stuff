@@ -47,19 +47,19 @@ main :: proc() {
 
 
 // or_return
-clone :: proc(
-	s: string,
-	allocator := context.allocator,
-	loc := #caller_location,
-) -> (
-	res: string,
-	err: mem.Allocator_Error, // We need named return values because we would need to return a something declared in the or_return
-) #optional_allocator_error {
-	// If error on make, the error is returned
-	c := make([]byte, len(s), allocator, loc) or_return
-	copy(c, s)
-	return string(c[:len(s)]), nil
-}
-
+// clone :: proc(
+// 	s: string,
+// 	allocator := context.allocator,
+// 	loc := #caller_location,
+// ) -> (
+// 	res: string,
+// 	err: mem.Allocator_Error, // We need named return values because we would need to return a something declared in the or_return
+// ) #optional_allocator_error {
+// 	// If error on make, the error is returned
+// 	c := make([]byte, len(s), allocator, loc) or_return
+// 	copy(c, s)
+// 	return string(c[:len(s)]), nil
+// }
+//
 
 // We can use #optional_ok and #optional_allocator_error to make optional bools or errors

@@ -1,5 +1,24 @@
 # odin-stuff
 
+
+## Procedure Attributes
+Son declaraciones que cambian el comportamiento de declaraciones en compile time.
+```odin
+@require_results
+@(private = "file")
+@(private="file", require_results)
+@(default_calling_convention="c")
+
+```
+
+## Building
+- Los bindings son programas que linkean librerias a otro idioma, definen los archivos a importar, y que funciones hacer publicas. En odin se utiliza la  calling convention = c cuando la libreria esta escrita en C, ya que odin siempre pasa el contexto automaticamente, lo cual haria que las funciones declaradas anteriormente, tengan la signature mal.
+- Podemos aislar archivos a la hora de compilarlos para segun que sistemas de estas dos formas: 
+    -  Añadiendo #+build linux or #+build !linux, para compilar exlusivamente o no hacerlo
+    -  Sufijando los files con "_windows.odin", para compilar exlusivamente en windows.
+
+
+
 ## Arenas
 En odin podemos usar 3 implementaciones definidas en:
 - core:mem/

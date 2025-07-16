@@ -30,7 +30,3 @@ main :: proc() {
 		fmt.printf("Element %d: %d\n", i, my_array.data[i])
 	}
 }
-
-breakpoint :: proc() {
- asm volatile ("int3")
-}
