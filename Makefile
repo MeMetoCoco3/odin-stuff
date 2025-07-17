@@ -4,9 +4,13 @@
 # 	glslc ./shaders/shader.glsl.vert -o ./files/shader.spv.vert || exit 1
 # 	@odin build  ./files/init_window.odin -file -out:odin -debug 
 # 	@odin run 
+# f:
+# 	odin build ./files/$(f).odin -file -out:./$(f)
+# 	./$(f)
 f:
-	odin build ./files/$(f).odin -file -out:./$(f)
-	./$(f)
+	odin run ./files/$(f).odin -file 
+
+
 run:
 	odin run .
 clear:
