@@ -1,6 +1,24 @@
 # odin-stuff
 
 
+## Handles are the better pointers
+La memoria dinamica puede crecer, lo que significa que en ciertos momentos si guardamos un puntero y la memoria crece, esta referencia se pierda. Los Handles ayudan con esto.
+Un handle es una referencia a la posicion en una HandlerBasedArray, y una referencia a la generacion, estos dos numeros identifican la entidad que hacen referencia.
+La HBA tiene dos dynamic arrays, una con los valores que queremos guardar, y otra con handlers que apuntana  huecos vacios. Si podemos usar un hueco vacio lo usarmeos, y le sumaremos uno a la generacion, guardaremos el valor en la posicion que indica el handler, y, IMPORTANTE, el valor tambien guardara el propio handler. De esta forma podremos comparar este handler con referencias fuera de la HBA para identificar si el valor que hay es el que buscamos.
+La existencia de handles va pareja con la idea de no almacenar pointers.
+Otras cosas interesantes que ofrecen los handles son:
+-  Los handles con indice 0 estan libres para usar.
+-  Lista de free positions, que permite manipularlas con O(1).
+-  Podemos mantener los handlers dentro de los systemas para tener mas control, respecto a donde esta nuestra memoria.
+-  Si cogemos un puntero a un valor, y anadimos valores de tal manera que se realoc los valores del handler, el puntero que sacamos estara muerto.
+
+Los problemas relacionados con este ultimo punto se solucionan si usamos fixed-size arrays o si creamos una nueva array con nuestras nuevas entidades y tras manipular todas nuestras entidades las añadimos.
+
+
+
+ref= https://zylinski.se/posts/handle-based-arrays/
+ref= https://floooh.github.io/2018/06/17/handles-vs-pointers.html
+
 ## Procedure Attributes
 Son declaraciones que cambian el comportamiento de declaraciones en compile time.
 ```odin
@@ -8,7 +26,6 @@ Son declaraciones que cambian el comportamiento de declaraciones en compile time
 @(private = "file")
 @(private="file", require_results)
 @(default_calling_convention="c")
-
 ```
 
 ## Building
